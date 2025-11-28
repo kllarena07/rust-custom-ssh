@@ -44,6 +44,41 @@ fn create_ssh_packet(payload: Vec<u8>) -> Vec<u8> {
     packet
 }
 
+fn from_ssh_packet(packet: &[u8]) -> Result<Vec<u8>, &'static str> {
+    // return the ssh packet payload
+    // SSH packet format: [packet_length][padding_length][payload][padding][MAC]
+    // packet_length: 4 bytes, includes padding_length + payload + padding
+    // padding_length: 1 byte, number of padding bytes
+
+    if packet.len() < 5 {
+        return Err("Packet too short");
+    }
+
+    // Extract packet length (first 4 bytes)
+    let packet_length = u32::from_be_bytes([packet[0], packet[1], packet[2], packet[3]]) as usize;
+
+    // Extract padding length (5th byte)
+    let padding_length = packet[4] as usize;
+
+    // Validate packet length
+    if packet_length + 4 != packet.len() {
+        return Err("Invalid packet length");
+    }
+
+    // Calculate payload size: total_packet_size - 4(length) - 1(padding_length) - padding_length
+    let payload_size = packet_length - 1 - padding_length;
+
+    // Extract payload (starts after 5 bytes: 4 for length, 1 for padding_length)
+    let payload_start = 5;
+    let payload_end = payload_start + payload_size;
+
+    if payload_end > packet.len() {
+        return Err("Payload extends beyond packet");
+    }
+
+    Ok(packet[payload_start..payload_end].to_vec())
+}
+
 fn to_name_list(value: &str) -> Vec<u8> {
     // A string containing a comma-separated list of names.
     // https://datatracker.ietf.org/doc/html/rfc4251#section-5
