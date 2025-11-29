@@ -429,6 +429,23 @@ fn handle_client(mut stream: TcpStream) -> io::Result<()> {
 
     println!("KEXDH_REPLY packet sent");
 
+    // Receive client's SSH2_MSG_NEWKEYS packet for rekey
+    let rekey_packet_buf = read_ssh_packet(&mut stream)?;
+    let client_kexinit_payload = from_ssh_packet(&rekey_packet_buf)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    println!(
+        "Received client KEXINIT payload for rekey: {:?}",
+        client_kexinit_payload
+    );
+    println!("The payload should be 21. This means SSH2_MSG_NEWKEYS according to RFC 4253");
+
+    // SSH2_MSG_NEWKEYS packet
+    let kex_payload_rekey: Vec<u8> = vec![21u8];
+
+    let rekey_kex_packet = create_ssh_packet(kex_payload_rekey);
+    stream.write_all(&rekey_kex_packet)?;
+    stream.flush()?;
+
     loop {}
 
     // Ok(())
